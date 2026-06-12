@@ -6,19 +6,26 @@ services:
     env_file: .env
     volumes:
       - wp-db:/var/lib/mysql
+
     networks:
       - inception
     restart: on-failure
 
   wordpress:
     # WordPress → MariaDB via mariadb:3306
-    networks:
-      - inception
 
-  nginx:
-    # NGINX → WordPress via wordpress:9000
+    build: ./requirements/wordpress
+    image: wordpress
+    container_name: wordpress
+    env_file: .env
+    volumes:
+      - wp-files:/var/www/html
+
     networks:
       - inception
+    restart: on-failure
+    depends_on:
+      - mariadb
 
 volumes:
   wp-db:
@@ -27,6 +34,22 @@ volumes:
       type: none
       o: bind
       device: /home/${USER}/data/db
+
+  wp-files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/${USER}/data/wordpress
+
+  nginx:
+    # NGINX → WordPress via wordpress:9000
+
+
+    networks:
+      - inception
+
+
 
 networks:
   inception:
