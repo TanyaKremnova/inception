@@ -13,7 +13,6 @@ services:
 
   wordpress:
     # WordPress → MariaDB via mariadb:3306
-
     build: ./requirements/wordpress
     image: wordpress
     container_name: wordpress
@@ -44,13 +43,25 @@ volumes:
 
   nginx:
     # NGINX → WordPress via wordpress:9000
-
+    build: ./requirements/nginx
+    image: nginx
+    container_name: nginx
+    env_file: .env
+    ports:
+      - "443:443"
+    volumes:
+      - wp-files:/var/www/html
 
     networks:
       - inception
+    restart: on-failure
+    depends_on:
+      - wordpress
 
 
 
 networks:
   inception:
     driver: bridge
+
+# Browser → NGINX (443) → WordPress+php-fpm (9000) → MariaDB (3306)
