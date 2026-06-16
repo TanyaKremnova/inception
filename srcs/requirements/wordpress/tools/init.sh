@@ -1,26 +1,19 @@
 #!/bin/bash
 set -e
 
-# Read password from secret or env
 DB_PASSWORD=${DB_PASSWORD:-$(cat /run/secrets/db_password 2>/dev/null)}
-
 WP_DIR="/var/www/html"
 
-# Only set up WordPress if not already done (first run check)
-if [ ! -f "${WP_DIR}/wp-config.php" ]; then
-
-    if [ ! -f "${WP_DIR}/wp-login.php" ]; then
-        echo ">>> Downloading WordPress..."
-        wp core download \
-            --path="${WP_DIR}" \
-            --allow-root
-    fi
-
+# Download WordPress only if core files are missing
+if [ ! -f "${WP_DIR}/wp-login.php" ]; then
     echo ">>> Downloading WordPress..."
     wp core download \
         --path="${WP_DIR}" \
         --allow-root
+fi
 
+# Configure WordPress only if wp-config doesn't exist yet
+if [ ! -f "${WP_DIR}/wp-config.php" ]; then
     echo ">>> Creating wp-config.php..."
     wp config create \
         --path="${WP_DIR}" \
@@ -30,9 +23,9 @@ if [ ! -f "${WP_DIR}/wp-config.php" ]; then
         --dbhost="mariadb:3306" \
         --allow-root
 
-    echo ">>> Waiting for MariaDB to be ready..."
+    echo ">>> Waiting for MariaDB..."
     until wp db check --path="${WP_DIR}" --allow-root 2>/dev/null; do
-        echo "    MariaDB not ready yet, retrying in 3s..."
+        echo "    Not ready, retrying in 3s..."
         sleep 3
     done
 
@@ -55,11 +48,8 @@ if [ ! -f "${WP_DIR}/wp-config.php" ]; then
         --path="${WP_DIR}" \
         --allow-root
 
-    echo ">>> Fixing permissions..."
     chown -R www-data:www-data "${WP_DIR}"
-
 fi
 
 echo ">>> Starting php-fpm..."
-# Run php-fpm in foreground as PID 1 — no daemon mode
 exec /usr/sbin/php-fpm8.2 --nodaemonize
