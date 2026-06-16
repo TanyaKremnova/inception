@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     php8.2-zip \
     wget \
     curl \
+    default-mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install WP-CLI — the WordPress command line tool
