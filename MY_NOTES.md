@@ -148,3 +148,10 @@ docker compose down
 docker system prune -af
 docker compose up --build
 ```
+
+
+## Inside MariaDB:
+```bash
+SELECT User, Host FROM mysql.user;
+SHOW DATABASES;
+```
