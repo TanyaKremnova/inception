@@ -5,11 +5,12 @@ services:
     container_name: mariadb
     env_file: .env
     volumes:
-      - wp-db:/var/lib/mysql
+      - wp-db:/var/lib/mysql  # ← named volume
 
     networks:
       - inception
     restart: on-failure
+
 
   wordpress:
     # WordPress → MariaDB via mariadb:3306
@@ -18,7 +19,7 @@ services:
     container_name: wordpress
     env_file: .env
     volumes:
-      - wp-files:/var/www/html
+      - wp-files:/var/www/html  # ← named volume
 
     networks:
       - inception
@@ -26,20 +27,6 @@ services:
     depends_on:
       - mariadb
 
-volumes:
-  wp-db:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /home/${USER}/data/db
-
-  wp-files:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /home/${USER}/data/wordpress
 
   nginx:
     # NGINX → WordPress via wordpress:9000
@@ -50,7 +37,7 @@ volumes:
     ports:
       - "443:443"
     volumes:
-      - wp-files:/var/www/html
+      - wp-files:/var/www/html  # ← same volume, shared with wordpress
 
     networks:
       - inception
@@ -58,6 +45,26 @@ volumes:
     depends_on:
       - wordpress
 
+
+
+# driver: local          → use Docker's built-in local storage driver
+# type: none             → no special filesystem type, use the host's existing filesystem
+# o: bind                → mount option "bind" — map to an exact host path
+# device: /home/...      → which host path to bind to
+volumes:
+  wp-db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/tkremnov/data/db  # /home/${USER}/data/db
+
+  wp-files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/tkremnov/data/wordpress
 
 
 networks:

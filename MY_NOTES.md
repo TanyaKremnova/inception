@@ -138,3 +138,13 @@ Browser: https://yourlogin.42.fr
                  │
                  └── returns data → php builds HTML → back to NGINX → back to browser
 ```
+
+---
+
+## Clean and restart
+
+```bash
+docker compose down
+docker system prune -af
+docker compose up --build
+```
