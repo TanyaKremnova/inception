@@ -9,6 +9,13 @@ WP_DIR="/var/www/html"
 # Only set up WordPress if not already done (first run check)
 if [ ! -f "${WP_DIR}/wp-config.php" ]; then
 
+    if [ ! -f "${WP_DIR}/wp-login.php" ]; then
+        echo ">>> Downloading WordPress..."
+        wp core download \
+            --path="${WP_DIR}" \
+            --allow-root
+    fi
+
     echo ">>> Downloading WordPress..."
     wp core download \
         --path="${WP_DIR}" \
