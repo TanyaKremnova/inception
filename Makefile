@@ -26,6 +26,7 @@ re: clean all
 
 clean: down
 	docker system prune -af
+	docker volume rm -f srcs_wp-db srcs_wp-files 2>/dev/null || true
 	sudo rm -rf /home/tkremnov/data/db
 	sudo rm -rf /home/tkremnov/data/wordpress
 

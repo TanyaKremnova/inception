@@ -155,3 +155,26 @@ docker compose up --build
 SELECT User, Host FROM mysql.user;
 SHOW DATABASES;
 ```
+
+## Create the .env inside the VM
+
+```bash
+cat > ~/inception/srcs/.env << 'EOF'
+DOMAIN_NAME=tkremnov.42.fr
+MYSQL_DATABASE=wordpress
+MYSQL_USER=wpuser
+MYSQL_ADMIN_USER=wpmaster
+DB_PASSWORD=somepassword
+DB_ROOT_PASSWORD=somerootpassword
+EOF
+```
+
+### Create the data directories on the VM:
+```bash
+mkdir -p ~/data/db ~/data/wordpress
+```
+
+### Add your domain to /etc/hosts on the VM
+```bash
+echo "127.0.0.1 tkremnov.42.fr" | sudo tee -a /etc/hosts
+```
