@@ -32,4 +32,4 @@ EOF
 fi
 
 echo ">>> Starting MariaDB..."
-exec mysqld --user=mysql
+exec mysqld --user=mysql --bind-address=0.0.0.0
