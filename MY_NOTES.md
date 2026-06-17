@@ -178,3 +178,21 @@ mkdir -p ~/data/db ~/data/wordpress
 ```bash
 echo "127.0.0.1 tkremnov.42.fr" | sudo tee -a /etc/hosts
 ```
+
+### Shut down the VM
+```bash
+# On the VM
+sudo poweroff
+```
+
+### Use local browser to rich the web page
+```bash
+pkill chrome
+
+google-chrome \
+  --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
+  --ignore-certificate-errors \
+  --log-level=3 \
+  https://tkremnov.42.fr:8443
+
+```
