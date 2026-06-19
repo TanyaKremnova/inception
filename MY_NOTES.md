@@ -200,6 +200,7 @@ google-chrome \
 chromium \
   --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
   --ignore-certificate-errors \
+  --log-level=3 \
   https://tkremnov.42.fr:8443
 ```
 
@@ -260,6 +261,39 @@ Wordpress-mariadb
 - set -i “s/localhost/mariadb:5555/”
 - comment out the if statement fi
 ```
+
+# Verification checklist
+
+1. **Log in as admin (`wpmaster`)**
+
+```bash
+https://tkremnov.42.fr/wp-admin/
+```
+Username: `wpmaster`, Password: `somepassword` (from the `.env`)
+
+2. **Create/edit a post**
+Posts → Add New → write something → Publish
+
+3. **Log out**
+Top right → your name → Log Out
+
+4. **Log in as regular user (`wpuser`)**
+Same login page, username `wpuser`, same password (since you used `${DB_PASSWORD}` for both)
+
+5. **Show a simple action as regular user**
+Since `wpuser` has the `author` role (set in your init.sh), they can:
+
+View their dashboard
+Edit their own profile (Users → Profile)
+Create a draft post (but can't publish others' posts or manage plugins/themes — that's admin-only, which is the correct behavior to demonstrate during defense)
+
+
+
+---
+---
+---
+---
+---
 
 # Networking, Docker, Virtual Machines, and Ports
 
