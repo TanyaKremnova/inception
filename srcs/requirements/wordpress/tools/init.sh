@@ -23,13 +23,8 @@ if [ ! -f "${WP_DIR}/wp-config.php" ]; then
         --skip-check \
         --allow-root
 
-    # wp config set WP_HOME "https://tkremnov.42.fr:8443" --path=/var/www/html --allow-root
-    # wp config set WP_SITEURL "https://tkremnov.42.fr:8443" --path=/var/www/html --allow-root
-
-    WP_URL="${PROTOCOL}://${DOMAIN_NAME}:${WP_PORT}"
-
-    wp config set WP_HOME "${WP_URL}" --path="${WP_DIR}" --allow-root
-    wp config set WP_SITEURL "${WP_URL}" --path="${WP_DIR}" --allow-root
+    wp config set WP_HOME "https://tkremnov.42.fr:8443" --path=/var/www/html --allow-root
+    wp config set WP_SITEURL "https://tkremnov.42.fr:8443" --path=/var/www/html --allow-root
 
     echo ">>> Waiting for MariaDB to be ready..."
     until mysqladmin ping -h mariadb -u"${MYSQL_USER}" -p"${DB_PASSWORD}" --silent 2>/dev/null; do

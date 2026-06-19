@@ -17,9 +17,5 @@ if [ ! -f "${CERT}" ]; then
         -subj "/C=NL/ST=Noord-Holland/L=Amsterdam/O=42/CN=${DOMAIN_NAME}"
 fi
 
-    sed -e "s/\${DOMAIN_NAME}/${DOMAIN_NAME}/g" \
-        -e "s/\${WP_PORT}/${WP_PORT}/g" \
-        /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
-
 # Start nginx in foreground as PID 1
 exec nginx -g "daemon off;"
