@@ -226,8 +226,8 @@ docker exec wordpress wp option get siteurl --allow-root
 ```bash
 cd /home/tkremnov/inception/srcs   # inside the VM
 
-docker exec -it wordpress wp option update siteurl 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
-docker exec -it wordpress wp option update home 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
+docker exec wordpress wp option update siteurl 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
+docker exec wordpress wp option update home 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
 ```
 
 
@@ -759,3 +759,64 @@ NGINX only sees the final destination:
 ```
 
 and has no idea that the original request came through port 8443.
+
+
+---
+---
+---
+---
+---
+
+# Change NGINX external port (example: 8443 -> 4443)
+
+1. VirtualBox
+   Host Port  : 4443
+   Guest Port : 443
+
+2. docker-compose.yml
+   nginx:
+     ports:
+       - "443:443"
+
+   (Usually NO change needed here because nginx still listens on 443
+    inside the container.)
+
+3. nginx.conf
+   If HTTP_HOST is hardcoded:
+     fastcgi_param HTTP_HOST tkremnov.42.fr:4443;
+
+4. Restart containers
+   docker compose down
+   docker compose up -d --build
+
+5. Update WordPress URLs
+
+   From host:
+```bash
+   docker exec wordpress wp option update home \
+   'https://tkremnov.42.fr:4443' \
+   --path=/var/www/html --allow-root
+
+   docker exec wordpress wp option update siteurl \
+   'https://tkremnov.42.fr:4443' \
+   --path=/var/www/html --allow-root
+```
+
+6. Verify
+```bash
+   docker exec wordpress wp option get home \
+   --path=/var/www/html --allow-root
+
+   docker exec wordpress wp option get siteurl \
+   --path=/var/www/html --allow-root
+```
+
+7. Open browser
+
+```bash
+   chromium \
+  --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
+  --ignore-certificate-errors \
+  --log-level=3 \
+  https://tkremnov.42.fr:4443/
+```
