@@ -38,4 +38,3 @@ ENTRYPOINT ["/init.sh"]
 # php-gd			— image manipulation (thumbnails)
 # php-mbstring		— multibyte string handling
 # php-xml / php-zip	— needed for plugin/theme installation
-
