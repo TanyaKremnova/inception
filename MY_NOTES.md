@@ -195,4 +195,533 @@ google-chrome \
   --log-level=3 \
   https://tkremnov.42.fr:8443
 
+# or
+
+chromium \
+  --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
+  --ignore-certificate-errors \
+  https://tkremnov.42.fr:8443
 ```
+
+### Check if NGINX is actually listening on 443 inside the container
+```bash
+docker exec -it nginx ss -tlnp | grep 443
+
+# and/or
+
+docker exec nginx nginx -T | grep listen
+```
+
+### Confirm what WordPress thinks its URL is
+```bash
+docker exec wordpress wp option get home --allow-root
+docker exec wordpress wp option get siteurl --allow-root
+
+# Expected:
+# https://tkremnov.42.fr:8443
+```
+
+### Change the port
+```bash
+cd /home/tkremnov/inception/srcs   # inside the VM
+
+docker exec -it wordpress wp option update siteurl 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
+docker exec -it wordpress wp option update home 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
+```
+
+
+```notes
+Change port commands WP:
+Enter WordPress container.
+Go to the root folder of WP.
+nginx
+-change  nginx config
+-change YML
+-nginx docker file
+-update wordpress URL port
+wp --path=/var/www/html option get home --allow-root
+wp --path=/var/www/html option get siteurl --allow-root
+
+wp --path=/var/www/html option update home 'https://ipavlov.42.fr:4443' --allow-root
+wp --path=/var/www/html option update siteurl 'https://ipavlov.42.fr:4443' --allow-root
+
+Nginx-wordpress
+-change nginx default.config - location
+-change wordpress - RUN
+Check:
+Docker exec -it wordpress grep “listen =” /etc/php/7.4/fpm/pool.d/www.conf
+
+
+
+Wordpress-mariadb
+-add port = XXX in 50-server.cnf
+-change setup.sh in wordpress
+- until mysql -h mariadb -P XXXX and
+- set -i “s/localhost/mariadb:5555/”
+- comment out the if statement fi
+```
+
+# Networking, Docker, Virtual Machines, and Ports
+
+## Why are ports 0-1023 special?
+
+Ports **0-1023** are called **privileged ports**.
+
+Examples:
+
+| Port | Service |
+| ---- | ------- |
+| 22   | SSH     |
+| 25   | SMTP    |
+| 80   | HTTP    |
+| 443  | HTTPS   |
+
+Historically, only processes running as **root** are allowed to bind to these ports.
+
+Example:
+
+```bash
+python3 -m http.server 80
+```
+
+Normal user:
+
+```text
+Permission denied
+```
+
+Root:
+
+```bash
+sudo python3 -m http.server 80
+```
+
+Works.
+
+### Why?
+
+Imagine a multi-user server.
+
+Without this restriction, any user could start a fake SSH server on port 22 and steal credentials.
+
+The privileged-port rule helps prevent this.
+
+---
+
+# Why can NGINX use port 443 inside Docker?
+
+When a container starts, its main process usually starts as root.
+
+NGINX:
+
+1. Starts as root
+2. Opens port 443
+3. Creates worker processes
+4. Drops privileges to `www-data`
+
+This is why the following works:
+
+```nginx
+listen 443 ssl;
+```
+
+even though NGINX workers are not running as root.
+
+---
+
+# Why does the Inception subject want port 443?
+
+HTTPS normally runs on:
+
+```text
+443
+```
+
+The subject expects NGINX to serve HTTPS using TLS.
+
+Typical configuration:
+
+```nginx
+listen 443 ssl;
+```
+
+Inside the container, NGINX should behave like a real HTTPS server.
+
+---
+
+# What is Docker?
+
+Docker containers are **not virtual machines**.
+
+Containers share the host's Linux kernel.
+
+Simplified:
+
+```text
+Host Linux Kernel
+├── Container A
+├── Container B
+└── Container C
+```
+
+All containers use the same kernel.
+
+This makes containers:
+
+* lightweight
+* fast to start
+* low memory usage
+
+---
+
+# Does Docker use disk space?
+
+Yes.
+
+Docker stores:
+
+* Images
+* Containers
+* Volumes
+* Networks
+* Logs
+
+Usually under:
+
+```text
+/var/lib/docker
+```
+
+Check usage:
+
+```bash
+docker system df
+```
+
+Example:
+
+```text
+Images      2.5GB
+Containers  300MB
+Volumes     1.2GB
+```
+
+---
+
+# What are Docker volumes?
+
+Volumes provide persistent storage.
+
+Without a volume:
+
+```text
+Container deleted
+↓
+Data deleted
+```
+
+With a volume:
+
+```text
+Container deleted
+↓
+Data survives
+```
+
+In Inception:
+
+* WordPress files are stored in a volume
+* MariaDB data is stored in a volume
+
+This allows data to survive container rebuilds.
+
+---
+
+# What is a Virtual Machine?
+
+A VM is a complete computer running inside another computer.
+
+Example:
+
+```text
+Host Computer
+└── VirtualBox
+    └── Debian VM
+```
+
+The VM has:
+
+* Its own operating system
+* Its own users
+* Its own processes
+* Its own filesystem
+* Its own networking
+
+From the operating system's perspective, it behaves like a real machine.
+
+---
+
+# Does a VM use disk space?
+
+Yes.
+
+VirtualBox creates a virtual disk file.
+
+Example:
+
+```text
+debian.vdi
+```
+
+This file contains:
+
+* Debian
+* Docker
+* Images
+* Containers
+* Databases
+* Logs
+* Everything stored inside the VM
+
+Deleting Docker containers does not remove the VM.
+
+Deleting the VM removes everything inside it.
+
+---
+
+# Does a VM use RAM?
+
+Yes.
+
+If VirtualBox allocates:
+
+```text
+4 GB RAM
+```
+
+Then while the VM is running:
+
+```text
+Host RAM
+↓
+4 GB reserved for VM
+```
+
+When the VM is powered off:
+
+```text
+RAM returns to the host
+```
+
+---
+
+# Does the VM have all ports?
+
+Yes.
+
+The VM is a separate computer.
+
+Inside the VM:
+
+```text
+0 - 65535
+```
+
+all ports exist.
+
+Examples:
+
+```text
+22    SSH
+443   HTTPS
+3306  MariaDB
+9000  PHP-FPM
+```
+
+The VM can use these ports independently from the host.
+
+---
+
+# Why can't the host automatically access VM ports?
+
+Because VirtualBox sits between them.
+
+Architecture:
+
+```text
+Host Computer
+      |
+VirtualBox
+      |
+Guest VM
+```
+
+The VM is isolated.
+
+VirtualBox decides which ports are exposed to the host.
+
+---
+
+# What does "Host 8443 → Guest 443" mean?
+
+Example VirtualBox rule:
+
+```text
+Host Port: 8443
+Guest Port: 443
+```
+
+Traffic flow:
+
+```text
+Browser
+    |
+localhost:8443
+    |
+VirtualBox NAT
+    |
+VM:443
+```
+
+When the browser connects to:
+
+```text
+https://localhost:8443
+```
+
+VirtualBox forwards traffic to:
+
+```text
+VM port 443
+```
+
+where NGINX is listening.
+
+---
+
+# Why not use Host 443 → Guest 443?
+
+You can.
+
+Example:
+
+```text
+Host 443
+↓
+Guest 443
+```
+
+However:
+
+* Port 443 may already be used on the host
+* Low ports sometimes require extra permissions
+* Using 8443 avoids conflicts
+
+Many developers use:
+
+```text
+Host:8443
+Guest:443
+```
+
+for local development.
+
+---
+
+# Docker port mapping
+
+Inside the VM you also have Docker port forwarding.
+
+Example:
+
+```bash
+docker ps
+```
+
+shows:
+
+```text
+0.0.0.0:8443->443/tcp
+```
+
+Meaning:
+
+```text
+VM Port 8443
+      ↓
+Container Port 443
+```
+
+Docker receives traffic on VM port 8443 and forwards it into the container.
+
+---
+
+# Complete traffic path in Inception
+
+Current setup:
+
+```text
+Chrome (Host)
+      |
+      | https://localhost:8443
+      |
+      V
+VirtualBox NAT
+      |
+      | Host:8443 -> VM:8443
+      |
+      V
+Debian VM
+      |
+      | Docker mapping
+      | 8443 -> 443
+      |
+      V
+NGINX Container
+      |
+      | fastcgi_pass wordpress:9000
+      |
+      V
+WordPress Container
+      |
+      V
+MariaDB Container
+```
+
+---
+
+# Important conclusion
+
+The port you type in the browser is not necessarily the port NGINX listens on.
+
+Example:
+
+Browser:
+
+```text
+https://tkremnov.42.fr:8443
+```
+
+NGINX:
+
+```nginx
+listen 443 ssl;
+```
+
+Both are correct because forwarding layers translate:
+
+```text
+8443
+↓
+8443 (VM)
+↓
+443 (Container)
+```
+
+NGINX only sees the final destination:
+
+```text
+443
+```
+
+and has no idea that the original request came through port 8443.
