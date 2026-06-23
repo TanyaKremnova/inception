@@ -45,64 +45,72 @@ MariaDB
 - Stores WordPress data
 - Uses a dedicated persistent volume
 
+## WordPress Users
+
+Two users are created automatically on first run:
+- Administrator: username does not contain "admin" (per subject requirement)
+- Regular user: author role
+
+Credentials are defined via `.env` variables `MYSQL_ADMIN_USER` and `MYSQL_USER`.
+
 ## Design Choices
 
 ## Virtual Machines vs Docker
 
 ### Virtual Machine
-- Runs a full OS with its own kernel  
-- Strong isolation, heavier resource usage  
-- Slower startup  
+- Runs a full OS with its own kernel
+- Strong isolation, heavier resource usage
+- Slower startup
 - Required by subject (VM environment)
 
 ### Docker
-- Shares host kernel  
-- Lightweight and fast  
-- Each service runs in a separate container  
-- Managed via Docker Compose  
+- Shares host kernel
+- Lightweight and fast
+- Each service runs in a separate container
+- Managed via Docker Compose
 
-**Summary:**  
+**Summary:**
 VM provides isolation layer, Docker provides service isolation inside it.
 
 ## Secrets vs Environment Variables
 
 ### Environment Variables
-- Simple key-value configuration (`.env`)  
-- Visible inside container  
-- Used for non-sensitive config (DOMAIN, DB name)
+- Simple key-value configuration (`.env`)
+- Used for all configuration in this project (domain, DB credentials, ports)
+- Visible inside container environment
 
 ### Docker Secrets
-- Designed for sensitive data  
-- Stored outside image, mounted as files  
-- Not fully used here (Swarm feature)
+- Designed for sensitive data, mounted as files at runtime (e.g. `/run/secrets/`)
+- Not used for passwords in this implementation — `.env` was used instead per project minimum requirements
+- Would be the recommended production approach for credentials
 
-**Summary:**  
-Env vars = simple config, Secrets = secure storage for production.
+**Summary:**
+This project satisfies the mandatory `.env` requirement. Docker secrets were considered but not implemented; `.env` was used for all configuration including passwords, which the subject explicitly allows as the minimum requirement.
 
 ## Docker Network vs Host Network
 
 ### Bridge Network (used)
-- Containers communicate via service names  
-- Isolated from host  
+- Containers communicate via service names
+- Isolated from host
 - Recommended default
 
 ### Host Network
-- Shares host network directly  
-- No isolation, possible port conflicts  
+- Shares host network directly
+- No isolation, possible port conflicts
 
-**Summary:**  
+**Summary:**
 Bridge network ensures isolation and safe container communication.
 
 ## Docker Volumes vs Bind Mounts
 
 ### Volumes (used)
-- Managed by Docker  
-- Persistent and portable  
+- Managed by Docker
+- Persistent and portable
 - Best for databases and production data
 
 ### Bind Mounts
-- Direct host folder mapping  
-- Useful for development  
+- Direct host folder mapping
+- Useful for development
 - Less portable and less safe
 
 **Summary:**  
@@ -154,8 +162,11 @@ srcs/
 
 ## Resources
 
-### Articles
+### Article
 [A Dive into Docker and Docker-Compose](https://medium.com/@afatir.ahmedfatir/unveiling-42-the-network-inception-a-dive-into-docker-and-docker-compose-cfda98d9f4ac)
+
+### Video
+[The Only Docker Tutorial You Need To Get Started](https://www.youtube.com/watch?v=DQdB7wFEygo)
 
 ### Docker
 

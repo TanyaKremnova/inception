@@ -1,80 +1,91 @@
-## SSH – Connect to your Debian VM
+# Inception — Personal Notes
+
+Reference notes collected while building this project. Organized by topic for quick lookup.
+
+---
+
+## 1. SSH Access to the VM
+
+### Connect
+
 ```bash
 ssh tkremnov@127.0.0.1 -p 4242
 ```
 
-- `ssh` – SSH client, used to log into a remote machine securely.
-- `tkremnov` – The user name on the remote machine (your Debian VM).
-- `@127.0.0.1` – The remote host IP. `127.0.0.1` is your local machine (localhost), because you’re using port forwarding.
-- `-p 4242` – `-p` specifies the port to connect to.
-  - Default SSH port is 22.
-  - You configured VirtualBox to forward port `4242` on your host to port `22` (SSH) on the VM.
+| Part | Meaning |
+|---|---|
+| `ssh` | SSH client, used to log into a remote machine securely |
+| `tkremnov` | Username on the remote machine (the VM) |
+| `@127.0.0.1` | Remote host IP — `127.0.0.1` is localhost, used here via port forwarding |
+| `-p 4242` | Port to connect to. Default SSH port is 22; VirtualBox forwards host port 4242 → guest port 22 |
 
-This command opens an SSH session to your Debian VM and asks for the password.
+### Disconnect
 
-## Exit / Logout from SSH or shell
 ```bash
 exit
 ```
-
-If you used `newgrp docker`, you might need to run `exit` twice:
-- First `exit` → leaves the `docker` group shell.
-- Second `exit` → leaves the SSH session.
-
+or
 ```bash
 logout
 ```
-- Same as `exit`, but explicitly means “end this login session”.
-- Works in login shells (like an SSH session).
 
-## Docker
+If you used `newgrp docker`, you may need `exit` twice:
+- 1st `exit` → leaves the `docker` group shell
+- 2nd `exit` → leaves the SSH session
+
+---
+
+## 2. Docker Basics
+
+### Check versions
 
 ```bash
 docker --version
 docker compose version
 ```
 
-### Docker – Run a container
+### Run a test container
+
 ```bash
 sudo docker run --rm hello-world
 ```
 
-- `sudo` – Run as superuser (needed if your user is not in the docker group).
-- `docker` – Docker CLI.
-- `run` – Create and run a new container from an image.
-- `--rm` – Automatically remove the container when it exits (no leftover stopped containers).
-- `hello-world` – The image name to pull from Docker Hub and run.
+| Flag | Meaning |
+|---|---|
+| `sudo` | Run as superuser (needed if your user isn't in the `docker` group) |
+| `run` | Create and run a new container from an image |
+| `--rm` | Auto-remove the container when it exits |
+| `hello-world` | Image to pull and run |
 
-### Group management – Add user to docker group
+### Add your user to the docker group (avoid needing sudo)
 
 ```bash
 sudo usermod -aG docker tkremnov
 ```
+- `-a` = append, `-G docker` = add to the `docker` group without removing existing groups
 
-- `sudo` – Run as root.
-- `usermod` – Modify a user account.
-- `-aG docker` – `-a` = append, `-G` = add to a
-**group**
-- .Adds `tkremnov` to the `docker` group without removing them from other groups.
-
-After this, you still need to refresh your group membership (log out/in or use `newgrp docker`).
-
+Apply the new group without logging out:
 ```bash
 newgrp docker
 ```
-
-Starts a new shell with the docker group as an active group.  
-Allows you to run docker commands without sudo in that shell.
-
+Then test:
 ```bash
 docker run --rm hello-world
 ```
 
-## Quick mental model of the whole flow
+---
 
+## 3. Architecture — Mental Model of the Stack
+
+### Overall request flow
+
+```
 Browser → NGINX (443) → WordPress+php-fpm (9000) → MariaDB (3306)
+```
 
-```bash
+### MariaDB startup sequence
+
+```
 docker compose up
       │
       ▼
@@ -85,13 +96,15 @@ docker compose up
       └── exec mysqld  ← becomes PID 1, MariaDB is now running
 ```
 
-```bash
+### WordPress startup sequence
+
+```
 docker compose up
        │
        ▼
   WordPress container starts
        │
-       ├── wp-config.php exists? 
+       ├── wp-config.php exists?
        │        │
        │      NO → download WP → create config → wait for DB
        │                → wp core install → create users
@@ -103,7 +116,9 @@ docker compose up
                               NGINX sends FastCGI requests here
 ```
 
-```bash
+### NGINX request routing
+
+```
 Internet
     │
     │  HTTPS port 443 (TLS 1.2/1.3)
@@ -115,7 +130,9 @@ Internet
     └── PHP files → forwards to WordPress:9000 via FastCGI
 ```
 
-```bash
+### Full request lifecycle (detailed)
+
+```
 Browser: https://yourlogin.42.fr
          │
          │ TCP:443
@@ -141,7 +158,9 @@ Browser: https://yourlogin.42.fr
 
 ---
 
-## Clean and restart
+## 4. Useful Commands — Setup & Debugging
+
+### Clean and restart everything
 
 ```bash
 docker compose down
@@ -149,14 +168,7 @@ docker system prune -af
 docker compose up --build
 ```
 
-
-## Inside MariaDB:
-```bash
-SELECT User, Host FROM mysql.user;
-SHOW DATABASES;
-```
-
-## Create the .env inside the VM
+### Create `.env` directly on the VM
 
 ```bash
 cat > ~/inception/srcs/.env << 'EOF'
@@ -169,34 +181,80 @@ DB_ROOT_PASSWORD=somerootpassword
 EOF
 ```
 
-### Create the data directories on the VM:
+### Inspect MariaDB users/databases directly
+
+```bash
+docker exec -it mariadb mariadb -u root -p
+# use DB_ROOT_PASSWORD from .env
+
+# then inside MariaDB:
+SELECT User, Host FROM mysql.user;
+SHOW DATABASES;
+```
+
+### Create host data directories (for named volumes)
+
 ```bash
 mkdir -p ~/data/db ~/data/wordpress
 ```
 
-### Add your domain to /etc/hosts on the VM
+### Add domain to `/etc/hosts` on the VM
+
 ```bash
 echo "127.0.0.1 tkremnov.42.fr" | sudo tee -a /etc/hosts
 ```
 
-### Shut down the VM
+### Power off the VM cleanly
+
 ```bash
-# On the VM
 sudo poweroff
 ```
 
-### Use local browser to rich the web page
+### Check NGINX is actually listening on 443 inside the container
+
+```bash
+docker exec -it nginx ss -tlnp | grep 443
+# or
+docker exec nginx nginx -T | grep listen
+```
+
+### Confirm what WordPress thinks its own URL is
+
+```bash
+docker exec wordpress wp option get home --allow-root
+docker exec wordpress wp option get siteurl --allow-root
+# Expected: https://tkremnov.42.fr:8443
+```
+
+---
+
+## 5. Local Browser Access
+
+If workstations don't allow non-root binding to port 443, and `/etc/hosts` can't be edited without sudo locally, use VirtualBox port forwarding and browser host mapping.
+
+### Update WordPress URLs
+
+WordPress stores its own URL in the database. When using VirtualBox port forwarding (`8443 → 443`), update the stored URLs:
+
+```bash
+docker exec wordpress wp option update siteurl 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
+docker exec wordpress wp option update home 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
+```
+
+### Open browser with manual domain resolution
+
 ```bash
 pkill chrome
-
 google-chrome \
   --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
   --ignore-certificate-errors \
   --log-level=3 \
   https://tkremnov.42.fr:8443
+```
 
-# or
+or with Chromium:
 
+```bash
 chromium \
   --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
   --ignore-certificate-errors \
@@ -204,410 +262,180 @@ chromium \
   https://tkremnov.42.fr:8443
 ```
 
-### Check if NGINX is actually listening on 443 inside the container
-```bash
-docker exec -it nginx ss -tlnp | grep 443
+The browser flag makes Chrome/Chromium resolve tkremnov.42.fr to 127.0.0.1.
 
-# and/or
+### Checklist when changing the external port (e.g. 8443 → 4443)
 
-docker exec nginx nginx -T | grep listen
-```
+1. **VirtualBox** — update port forwarding rule: Host Port `4443` → Guest Port `443`
+2. **docker-compose.yml** — usually no change needed; NGINX still listens on `443` inside the container:
+   ```yaml
+   nginx:
+     ports:
+       - "443:443"
+   ```
+3. **nginx.conf** — if `HTTP_HOST` is hardcoded, update it:
+   ```nginx
+   fastcgi_param HTTP_HOST tkremnov.42.fr:4443;
+   ```
+4. **Restart containers:**
+   ```bash
+   docker compose down
+   docker compose up -d --build
+   ```
+5. **Update WordPress URLs:**
+   ```bash
+   docker exec wordpress wp option update home 'https://tkremnov.42.fr:4443' --path=/var/www/html --allow-root
+   docker exec wordpress wp option update siteurl 'https://tkremnov.42.fr:4443' --path=/var/www/html --allow-root
+   ```
+6. **Verify:**
+   ```bash
+   docker exec wordpress wp option get home --path=/var/www/html --allow-root
+   docker exec wordpress wp option get siteurl --path=/var/www/html --allow-root
+   ```
+7. **Open in browser:**
+   ```bash
+   chromium \
+     --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
+     --ignore-certificate-errors \
+     --log-level=3 \
+     https://tkremnov.42.fr:4443/
+   ```
 
-### Confirm what WordPress thinks its URL is
-```bash
-docker exec wordpress wp option get home --allow-root
-docker exec wordpress wp option get siteurl --allow-root
+> **Key lesson learned:** the port typed in the browser is not necessarily the port NGINX listens on. NGINX only ever sees the final destination port (`443`) after VirtualBox NAT and Docker port mapping have already translated it. Forgetting to update `HTTP_HOST`/`siteurl`/`home` consistently causes redirect loops — see Troubleshooting section below.
 
-# Expected:
-# https://tkremnov.42.fr:8443
-```
+---
 
-### Change the port
-```bash
-cd /home/tkremnov/inception/srcs   # inside the VM
-
-docker exec wordpress wp option update siteurl 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
-docker exec wordpress wp option update home 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
-```
-
-
-```notes
-Change port commands WP:
-Enter WordPress container.
-Go to the root folder of WP.
-nginx
--change  nginx config
--change YML
--nginx docker file
--update wordpress URL port
-wp --path=/var/www/html option get home --allow-root
-wp --path=/var/www/html option get siteurl --allow-root
-
-wp --path=/var/www/html option update home 'https://ipavlov.42.fr:4443' --allow-root
-wp --path=/var/www/html option update siteurl 'https://ipavlov.42.fr:4443' --allow-root
-
-Nginx-wordpress
--change nginx default.config - location
--change wordpress - RUN
-Check:
-Docker exec -it wordpress grep “listen =” /etc/php/7.4/fpm/pool.d/www.conf
-
-
-
-Wordpress-mariadb
--add port = XXX in 50-server.cnf
--change setup.sh in wordpress
-- until mysql -h mariadb -P XXXX and
-- set -i “s/localhost/mariadb:5555/”
-- comment out the if statement fi
-```
-
-# Verification checklist
+## 6. Verification Checklist (Manual Test Flow)
 
 1. **Log in as admin (`wpmaster`)**
-
-```bash
-https://tkremnov.42.fr/wp-admin/
-```
-Username: `wpmaster`, Password: `somepassword` (from the `.env`)
+   ```
+   https://tkremnov.42.fr/wp-admin/
+   ```
+   Username: `wpmaster`, Password: from `.env` (`DB_PASSWORD`)
 
 2. **Create/edit a post**
-Posts → Add New → write something → Publish
+   Posts → Add New → write something → Publish
 
 3. **Log out**
-Top right → your name → Log Out
+   Top right → your name → Log Out
 
 4. **Log in as regular user (`wpuser`)**
-Same login page, username `wpuser`, same password (since you used `${DB_PASSWORD}` for both)
+   Same login page, username `wpuser`, same password
 
 5. **Show a simple action as regular user**
-Since `wpuser` has the `author` role (set in your init.sh), they can:
+   Since `wpuser` has the `author` role, they can:
+   - View their dashboard
+   - Edit their own profile (Users → Profile)
+   - Create a draft post
 
-View their dashboard
-Edit their own profile (Users → Profile)
-Create a draft post (but can't publish others' posts or manage plugins/themes — that's admin-only, which is the correct behavior to demonstrate during defense)
-
-
+   They **cannot** publish others' posts or manage plugins/themes — correct, admin-only behavior to point out during defense.
 
 ---
----
----
----
----
 
-# Networking, Docker, Virtual Machines, and Ports
+## 7. Networking, Docker, and VMs — Concepts
 
-## Why are ports 0-1023 special?
-
-Ports **0-1023** are called **privileged ports**.
+### Why ports 0–1023 are special (privileged ports)
 
 Examples:
 
 | Port | Service |
-| ---- | ------- |
-| 22   | SSH     |
-| 25   | SMTP    |
-| 80   | HTTP    |
-| 443  | HTTPS   |
+|---|---|
+| 22 | SSH |
+| 25 | SMTP |
+| 80 | HTTP |
+| 443 | HTTPS |
 
-Historically, only processes running as **root** are allowed to bind to these ports.
-
-Example:
+Only root-owned processes can normally bind to these. Without this restriction, any unprivileged user on a shared server could start a fake SSH server on port 22 and steal credentials.
 
 ```bash
-python3 -m http.server 80
+python3 -m http.server 80      # Permission denied (non-root)
+sudo python3 -m http.server 80 # Works
 ```
 
-Normal user:
+### Why NGINX can use port 443 inside Docker
 
-```text
-Permission denied
-```
-
-Root:
-
-```bash
-sudo python3 -m http.server 80
-```
-
-Works.
-
-### Why?
-
-Imagine a multi-user server.
-
-Without this restriction, any user could start a fake SSH server on port 22 and steal credentials.
-
-The privileged-port rule helps prevent this.
-
----
-
-# Why can NGINX use port 443 inside Docker?
-
-When a container starts, its main process usually starts as root.
-
-NGINX:
-
+The container's main process typically starts as root:
 1. Starts as root
 2. Opens port 443
 3. Creates worker processes
 4. Drops privileges to `www-data`
 
-This is why the following works:
+This is why `listen 443 ssl;` works even though NGINX *workers* run as `www-data`, not root.
 
+### Why the subject wants port 443 specifically
+
+HTTPS conventionally runs on 443. The subject expects NGINX to behave like a real-world HTTPS server:
 ```nginx
 listen 443 ssl;
 ```
 
-even though NGINX workers are not running as root.
+### What Docker actually is
 
----
+Containers are **not** virtual machines — they share the host's Linux kernel:
 
-# Why does the Inception subject want port 443?
-
-HTTPS normally runs on:
-
-```text
-443
 ```
-
-The subject expects NGINX to serve HTTPS using TLS.
-
-Typical configuration:
-
-```nginx
-listen 443 ssl;
-```
-
-Inside the container, NGINX should behave like a real HTTPS server.
-
----
-
-# What is Docker?
-
-Docker containers are **not virtual machines**.
-
-Containers share the host's Linux kernel.
-
-Simplified:
-
-```text
 Host Linux Kernel
 ├── Container A
 ├── Container B
 └── Container C
 ```
 
-All containers use the same kernel.
+This makes them lightweight, fast to start, and low on memory overhead compared to a full VM.
 
-This makes containers:
+### Docker disk usage
 
-* lightweight
-* fast to start
-* low memory usage
-
----
-
-# Does Docker use disk space?
-
-Yes.
-
-Docker stores:
-
-* Images
-* Containers
-* Volumes
-* Networks
-* Logs
-
-Usually under:
-
-```text
-/var/lib/docker
-```
-
-Check usage:
+Docker stores images, containers, volumes, networks, and logs — typically under `/var/lib/docker`.
 
 ```bash
 docker system df
 ```
-
-Example:
-
-```text
+```
 Images      2.5GB
 Containers  300MB
 Volumes     1.2GB
 ```
 
----
+### What Docker volumes solve
 
-# What are Docker volumes?
+Without a volume: `Container deleted → Data deleted`
+With a volume: `Container deleted → Data survives`
 
-Volumes provide persistent storage.
+In this project: WordPress files and MariaDB data both live in named volumes, so data survives container rebuilds.
 
-Without a volume:
+### What a Virtual Machine actually is
 
-```text
-Container deleted
-↓
-Data deleted
+A complete computer running inside another computer:
 ```
-
-With a volume:
-
-```text
-Container deleted
-↓
-Data survives
-```
-
-In Inception:
-
-* WordPress files are stored in a volume
-* MariaDB data is stored in a volume
-
-This allows data to survive container rebuilds.
-
----
-
-# What is a Virtual Machine?
-
-A VM is a complete computer running inside another computer.
-
-Example:
-
-```text
 Host Computer
 └── VirtualBox
     └── Debian VM
 ```
+The VM has its own OS, users, processes, filesystem, and networking — it behaves like a real machine from the OS's perspective.
 
-The VM has:
+### VM disk and RAM usage
 
-* Its own operating system
-* Its own users
-* Its own processes
-* Its own filesystem
-* Its own networking
+- **Disk:** VirtualBox creates a virtual disk file (e.g. `debian.vdi`) holding the entire VM — OS, Docker, images, containers, databases, logs. Deleting Docker containers doesn't touch the VM; deleting the VM removes everything inside it.
+- **RAM:** Allocated RAM (e.g. 4GB) is reserved from the host while the VM runs, and returned when powered off.
 
-From the operating system's perspective, it behaves like a real machine.
+### Port availability inside the VM
 
----
+The VM is a separate machine — all ports `0–65535` exist independently inside it (22 SSH, 443 HTTPS, 3306 MariaDB, 9000 PHP-FPM, etc.), regardless of what's happening on the host.
 
-# Does a VM use disk space?
+### Why the host can't automatically reach VM ports
 
-Yes.
-
-VirtualBox creates a virtual disk file.
-
-Example:
-
-```text
-debian.vdi
+VirtualBox sits between host and guest:
 ```
-
-This file contains:
-
-* Debian
-* Docker
-* Images
-* Containers
-* Databases
-* Logs
-* Everything stored inside the VM
-
-Deleting Docker containers does not remove the VM.
-
-Deleting the VM removes everything inside it.
-
----
-
-# Does a VM use RAM?
-
-Yes.
-
-If VirtualBox allocates:
-
-```text
-4 GB RAM
-```
-
-Then while the VM is running:
-
-```text
-Host RAM
-↓
-4 GB reserved for VM
-```
-
-When the VM is powered off:
-
-```text
-RAM returns to the host
-```
-
----
-
-# Does the VM have all ports?
-
-Yes.
-
-The VM is a separate computer.
-
-Inside the VM:
-
-```text
-0 - 65535
-```
-
-all ports exist.
-
-Examples:
-
-```text
-22    SSH
-443   HTTPS
-3306  MariaDB
-9000  PHP-FPM
-```
-
-The VM can use these ports independently from the host.
-
----
-
-# Why can't the host automatically access VM ports?
-
-Because VirtualBox sits between them.
-
-Architecture:
-
-```text
 Host Computer
       |
 VirtualBox
       |
 Guest VM
 ```
+The VM is isolated; VirtualBox decides which ports are exposed to the host via explicit port-forwarding rules.
 
-The VM is isolated.
+### What "Host 8443 → Guest 443" means
 
-VirtualBox decides which ports are exposed to the host.
-
----
-
-# What does "Host 8443 → Guest 443" mean?
-
-Example VirtualBox rule:
-
-```text
-Host Port: 8443
-Guest Port: 443
 ```
-
-Traffic flow:
-
-```text
 Browser
     |
 localhost:8443
@@ -616,208 +444,93 @@ VirtualBox NAT
     |
 VM:443
 ```
+Connecting to `https://localhost:8443` gets forwarded by VirtualBox to port 443 inside the VM, where NGINX is listening.
 
-When the browser connects to:
+### Why not just use Host 443 → Guest 443?
 
-```text
-https://localhost:8443
-```
+You can, if available — but on Codam machines port 443 typically requires root to bind, and may already be in use. Using a higher port (e.g. 8443) on the host side avoids permission issues entirely; this is a common local-development pattern.
 
-VirtualBox forwards traffic to:
-
-```text
-VM port 443
-```
-
-where NGINX is listening.
-
----
-
-# Why not use Host 443 → Guest 443?
-
-You can.
-
-Example:
-
-```text
-Host 443
-↓
-Guest 443
-```
-
-However:
-
-* Port 443 may already be used on the host
-* Low ports sometimes require extra permissions
-* Using 8443 avoids conflicts
-
-Many developers use:
-
-```text
-Host:8443
-Guest:443
-```
-
-for local development.
-
----
-
-# Docker port mapping
-
-Inside the VM you also have Docker port forwarding.
-
-Example:
+### Docker's own port mapping (inside the VM)
 
 ```bash
 docker ps
+# 0.0.0.0:8443->443/tcp
 ```
+Meaning: VM port 8443 → Container port 443. Docker receives traffic on the VM's port and forwards it into the container.
 
-shows:
+### Full traffic path in this project
 
-```text
-0.0.0.0:8443->443/tcp
 ```
-
-Meaning:
-
-```text
-VM Port 8443
-      ↓
-Container Port 443
-```
-
-Docker receives traffic on VM port 8443 and forwards it into the container.
-
----
-
-# Complete traffic path in Inception
-
-Current setup:
-
-```text
-Chrome (Host)
+Chrome/Chromium (Host)
       |
-      | https://localhost:8443
-      |
+      | https://tkremnov.42.fr:8443
+      | (mapped to 127.0.0.1 by Chrome)
       V
-VirtualBox NAT
+Host machine
       |
-      | Host:8443 -> VM:8443
-      |
+      | VirtualBox NAT:
+      | Host:8443 -> Guest 443
       V
 Debian VM
       |
-      | Docker mapping
-      | 8443 -> 443
-      |
+      | Docker:
+      | VM port 443 -> nginx container port 443
       V
 NGINX Container
       |
       | fastcgi_pass wordpress:9000
-      |
       V
 WordPress Container
       |
+      | mariadb:3306
       V
 MariaDB Container
 ```
 
----
+### Explanation
 
-# Important conclusion
+**Browser**
 
-The port you type in the browser is not necessarily the port NGINX listens on.
-
-Example:
-
-Browser:
-
-```text
+You type:
+```bash
 https://tkremnov.42.fr:8443
 ```
-
-NGINX:
-
-```nginx
-listen 443 ssl;
+Chrome is told:
+```bash
+tkremnov.42.fr = 127.0.0.1
 ```
+so it actually sends traffic to your own machine.
 
-Both are correct because forwarding layers translate:
+**VirtualBox NAT**
 
+VirtualBox has a rule:
 ```text
-8443
-↓
-8443 (VM)
-↓
-443 (Container)
+Host: 8443 -> Guest: 443
 ```
 
-NGINX only sees the final destination:
+Meaning:
+```text
+Host receives request on port 8443
+            ↓
+Forwards it to VM port 443
+```
 
+**Debian VM**
+
+The VM receives HTTPS traffic on:
 ```text
 443
 ```
-
-and has no idea that the original request came through port 8443.
-
-
----
----
----
----
----
-
-# Change NGINX external port (example: 8443 -> 4443)
-
-1. VirtualBox  
-   Host Port  : 4443  
-   Guest Port : 443
-
-2. docker-compose.yml
+Docker Compose exposes:
 ```text
-   nginx:
-     ports:
-       - "443:443"
+ports:
+  - "443:443"
+```
+Meaning:
+```text
+VM port 443
+      ↓
+NGINX container port 443
 ```
 
-(Usually NO change needed here because nginx still listens on 443 inside the container.)
-
-3. nginx.conf  
-   If HTTP_HOST is hardcoded:  
-     `fastcgi_param HTTP_HOST tkremnov.42.fr:4443;`
-
-4. Restart containers  
-   `docker compose down`  
-   `docker compose up -d --build`
-
-5. Update WordPress URLs
-
-   From host:
-```bash
-docker exec wordpress wp option update home \
-'https://tkremnov.42.fr:4443' \
---path=/var/www/html --allow-root
-
-docker exec wordpress wp option update siteurl \
-'https://tkremnov.42.fr:4443' \
---path=/var/www/html --allow-root
-```
-
-6. Verify
-```bash
-docker exec wordpress wp option get home \
---path=/var/www/html --allow-root
-
-docker exec wordpress wp option get siteurl \
---path=/var/www/html --allow-root
-```
-
-7. Open browser
-
-```bash
-chromium \
---host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
---ignore-certificate-errors \
---log-level=3 \
-https://tkremnov.42.fr:4443/
-```
+**Key takeaway:** NGINX only ever sees the final destination port (443) after all forwarding layers translate it — it has no idea the original browser request came in on a different port. This is exactly why `HTTP_HOST`/`siteurl`/`home` must be set to match the *externally visible* port, not whatever `$server_port` reports inside the container.
