@@ -241,6 +241,12 @@ docker exec wordpress wp option update siteurl 'https://tkremnov.42.fr:8443' --p
 docker exec wordpress wp option update home 'https://tkremnov.42.fr:8443' --path=/var/www/html --allow-root
 ```
 
+Verify:
+```bash
+docker exec wordpress wp option get home --path=/var/www/html --allow-root
+docker exec wordpress wp option get siteurl --path=/var/www/html --allow-root
+```
+
 ### Open browser with manual domain resolution
 
 ```bash
@@ -264,44 +270,63 @@ chromium \
 
 The browser flag makes Chrome/Chromium resolve tkremnov.42.fr to 127.0.0.1.
 
-### Checklist when changing the external port (e.g. 8443 → 4443)
+### Change NGINX Port
 
-1. **VirtualBox** — update port forwarding rule: Host Port `4443` → Guest Port `443`
-2. **docker-compose.yml** — usually no change needed; NGINX still listens on `443` inside the container:
-   ```yaml
-   nginx:
-     ports:
-       - "443:443"
-   ```
-3. **nginx.conf** — if `HTTP_HOST` is hardcoded, update it:
-   ```nginx
-   fastcgi_param HTTP_HOST tkremnov.42.fr:4443;
-   ```
-4. **Restart containers:**
-   ```bash
-   docker compose down
-   docker compose up -d --build
-   ```
-5. **Update WordPress URLs:**
-   ```bash
-   docker exec wordpress wp option update home 'https://tkremnov.42.fr:4443' --path=/var/www/html --allow-root
-   docker exec wordpress wp option update siteurl 'https://tkremnov.42.fr:4443' --path=/var/www/html --allow-root
-   ```
-6. **Verify:**
-   ```bash
-   docker exec wordpress wp option get home --path=/var/www/html --allow-root
-   docker exec wordpress wp option get siteurl --path=/var/www/html --allow-root
-   ```
-7. **Open in browser:**
-   ```bash
-   chromium \
-     --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
-     --ignore-certificate-errors \
-     --log-level=3 \
-     https://tkremnov.42.fr:4443/
-   ```
+1. **Update NGINX configuration**  
+Edit:
+```bash
+srcs/requirements/nginx/conf/nginx.conf.template
+```
+Change:
+```bash
+listen 443 ssl;
+listen [::]:443 ssl;
+```
+to:
+```bash
+listen 4443 ssl;
+listen [::]:4443 ssl;
+```
+2. **Update Docker port mapping**
+Edit:
+```bash
+srcs/docker-compose.yml
+```
+Change:
+```bash
+ports:
+   - "443:443"
+```
+to:
+```bash
+ports:
+   - "4443:4443"
+```
+3. **Rebuild and restart**
+```bash
+make down
+make
+```
+4. **Verify container is running**
+```bash
+make ps
+```
+5. **Verify NGINX is listening on new port**
+```bash
+docker exec nginx ss -tln
+```
 
-> **Key lesson learned:** the port typed in the browser is not necessarily the port NGINX listens on. NGINX only ever sees the final destination port (`443`) after VirtualBox NAT and Docker port mapping have already translated it. Forgetting to update `HTTP_HOST`/`siteurl`/`home` consistently causes redirect loops — see Troubleshooting section below.
+Expected output should contain:
+
+```bash
+:4443
+```
+
+6. **Open website**
+
+```bash
+https://tkremnov.42.fr:4443
+```
 
 ---
 
