@@ -17,5 +17,11 @@ if [ ! -f "${CERT}" ]; then
         -subj "/C=NL/ST=Noord-Holland/L=Amsterdam/O=42/CN=${DOMAIN_NAME}"
 fi
 
+echo ">>> Generating nginx.conf from template"
+
+envsubst '${DOMAIN_NAME} ${WP_PORT}' \
+    < /etc/nginx/nginx.conf.template \
+    > /etc/nginx/nginx.conf
+
 # Start nginx in foreground as PID 1
 exec nginx -g "daemon off;"

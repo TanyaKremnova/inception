@@ -61,7 +61,7 @@ http {
 
             # Tell PHP the actual port the client connected through
             fastcgi_param HTTPS on;
-            fastcgi_param HTTP_HOST tkremnov.42.fr:8443;
+            fastcgi_param HTTP_HOST ${DOMAIN_NAME}:${WP_PORT};
         }
 
         # Deny access to .htaccess files (security)

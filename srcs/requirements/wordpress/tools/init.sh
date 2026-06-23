@@ -23,8 +23,11 @@ if [ ! -f "${WP_DIR}/wp-config.php" ]; then
         --skip-check \
         --allow-root
 
-    wp config set WP_HOME "https://tkremnov.42.fr:8443" --path=/var/www/html --allow-root
-    wp config set WP_SITEURL "https://tkremnov.42.fr:8443" --path=/var/www/html --allow-root
+    echo ">>> Setting WP_HOME and WP_SITEURL..."
+    WP_URL="https://${DOMAIN_NAME}:${WP_PORT}"
+
+    wp config set WP_HOME "${WP_URL}" --path="${WP_DIR}" --allow-root
+    wp config set WP_SITEURL "${WP_URL}" --path="${WP_DIR}" --allow-root
 
     echo ">>> Waiting for MariaDB to be ready..."
     until mysqladmin ping -h mariadb -u"${MYSQL_USER}" -p"${DB_PASSWORD}" --silent 2>/dev/null; do
@@ -35,7 +38,7 @@ if [ ! -f "${WP_DIR}/wp-config.php" ]; then
     echo ">>> Installing WordPress..."
     wp core install \
         --path="${WP_DIR}" \
-        --url="https://${DOMAIN_NAME}" \
+        --url="${WP_URL}" \
         --title="Inception" \
         --admin_user="${MYSQL_ADMIN_USER}" \
         --admin_password="${DB_PASSWORD}" \
