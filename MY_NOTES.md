@@ -249,6 +249,13 @@ docker exec wordpress wp option get siteurl --path=/var/www/html --allow-root
 
 ### Open browser with manual domain resolution
 
+Using curl:
+```bash
+curl -k --resolve tkremnov.42.fr:8443:127.0.0.1 https://tkremnov.42.fr:8443 | head
+```
+
+Chrome:
+
 ```bash
 pkill chrome
 google-chrome \
@@ -270,64 +277,51 @@ chromium \
 
 The browser flag makes Chrome/Chromium resolve tkremnov.42.fr to 127.0.0.1.
 
-### Change NGINX Port
+### Change Port
 
-1. **Update NGINX configuration**  
-Edit:
 ```bash
-srcs/requirements/nginx/conf/nginx.conf.template
+nano srcs/requirements/mariadb/conf/my.cnf
+# Change:
+# port = 3306 -> port = 3307
+
+nano srcs/requirements/mariadb/Dockerfile
+# Change:
+# EXPOSE 3306 -> EXPOSE 3307
+
+nano srcs/requirements/wordpress/tools/init.sh
+# Change:
+# --dbhost="mariadb:3306" -> --dbhost="mariadb:3307"
+
+# Also update the health check:
+# mysqladmin ping -h mariadb -P 3307
 ```
-Change:
+**Rebuild and restart the stack**
 ```bash
-listen 443 ssl;
-listen [::]:443 ssl;
-```
-to:
-```bash
-listen 4443 ssl;
-listen [::]:4443 ssl;
-```
-2. **Update Docker port mapping**
-Edit:
-```bash
-srcs/docker-compose.yml
-```
-Change:
-```bash
-ports:
-   - "443:443"
-```
-to:
-```bash
-ports:
-   - "4443:4443"
-```
-3. **Rebuild and restart**
-```bash
-make down
+make clean
 make
 ```
-4. **Verify container is running**
+**Verification**  
 ```bash
-make ps
+# Check MariaDB is listening on the new port:
+docker exec mariadb ss -tlnp
+# Expected:
+# 0.0.0.0:3307
+
+# Check WordPress connection:
+docker logs wordpress
+# Look for:
+# - `mysqld is alive`
+# - `Success: WordPress installed successfully`
+
+# Check DB host inside WP config:
+docker exec wordpress grep DB_HOST /var/www/html/wp-config.php
+# Expected:
+# define( 'DB_HOST', 'mariadb:3307' );
+
+docker exec wordpress wp db check --allow-root
+# Expected:
+# Success: Database checked.
 ```
-5. **Verify NGINX is listening on new port**
-```bash
-docker exec nginx ss -tln
-```
-
-Expected output should contain:
-
-```bash
-:4443
-```
-
-6. **Open website**
-
-```bash
-https://tkremnov.42.fr:4443
-```
-
 ---
 
 ## 6. Verification Checklist (Manual Test Flow)

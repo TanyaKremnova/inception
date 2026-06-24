@@ -30,7 +30,13 @@ if [ ! -f "${WP_DIR}/wp-config.php" ]; then
     wp config set WP_SITEURL "${WP_URL}" --path="${WP_DIR}" --allow-root
 
     echo ">>> Waiting for MariaDB to be ready..."
-    until mysqladmin ping -h mariadb -u"${MYSQL_USER}" -p"${DB_PASSWORD}" --silent 2>/dev/null; do
+    until mysqladmin ping \
+    -h mariadb \
+    -P 3306 \
+    -u"${MYSQL_USER}" \
+    -p"${DB_PASSWORD}" \
+    --silent 2>/dev/null; do
+
         echo "    Not ready, retrying in 2s..."
         sleep 2
     done
