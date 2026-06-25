@@ -553,3 +553,98 @@ NGINX container port 443
 ```
 
 **Key takeaway:** NGINX only ever sees the final destination port (443) after all forwarding layers translate it — it has no idea the original browser request came in on a different port. This is exactly why `HTTP_HOST`/`siteurl`/`home` must be set to match the *externally visible* port, not whatever `$server_port` reports inside the container.
+
+---
+---
+---
+# Eval:
+
+## Reset everything before testing, exactly as eval will:
+```bash
+docker stop $(docker ps -qa); docker rm $(docker ps -qa); docker rmi -f $(docker images -qa); docker volume rm $(docker volume ls -q); docker network rm $(docker network ls -q) 2>/dev/null
+```
+
+## Check Dockerfiles for forbidden patterns:
+```bash
+cat srcs/requirements/*/Dockerfile | grep ENTRYPOINT
+# must point to the init.sh scripts, not "bash" or "sh" alone
+```
+
+## Check current Debian stable name
+```bash
+# on the VM
+cat /etc/os-release
+```
+
+## Simple setup
+```bash
+docker compose -f srcs/docker-compose.yml ps
+# all 3 containers Up
+
+curl -k https://tkremnov.42.fr # WordPress HTML
+curl http://tkremnov.42.fr     # fail/refuse connection
+```
+
+## Docker Basics
+```bash
+docker compose -f srcs/docker-compose.yml config | grep "image:"
+
+# Each image name must match its service name exactly:
+image: mariadb:inception
+image: wordpress:inception
+image: nginx:inception
+```
+
+## Docker Network
+```bash
+grep -A 3 "^networks:" srcs/docker-compose.yml
+docker network ls
+# NETWORK ID     NAME             DRIVER    SCOPE
+# 25dcb0f8ab52   bridge           bridge    local
+# d9c71fbd8d87   host             host      local
+# 22c669c0a1b4   none             null      local
+# 3ea4748445d0   srcs_inception   bridge    local
+```
+
+## NGINX with SSL/TLS
+```bash
+# TLS version
+openssl s_client -connect tkremnov.42.fr:443 -tls1_2 < /dev/null 2>&1 | grep -i "protocol\|cipher"
+openssl s_client -connect tkremnov.42.fr:443 -tls1_3 < /dev/null 2>&1 | grep -i "protocol\|cipher"
+openssl s_client -connect tkremnov.42.fr:443 -tls1_1 < /dev/null 2>&1 | grep -i "error\|alert"
+# tls1.1 attempt MUST fail
+```
+
+## WordPress
+```bash
+# Admin login + page edit test:
+chromium \
+  --host-resolver-rules="MAP tkremnov.42.fr 127.0.0.1" \
+  --ignore-certificate-errors \
+  --log-level=3 \
+  https://tkremnov.42.fr:8443
+```
+
+## MariaDB
+```bash
+# DB login:
+docker exec -it mariadb mariadb -u root -p
+# enter DB_ROOT_PASSWORD when prompted
+
+SHOW DATABASES;
+USE wordpress;
+SHOW TABLES;
+SELECT user_login, user_email FROM wp_users;
+```
+
+## Persistence
+```bash
+make down
+sudo reboot
+
+make
+
+# verify:
+make ps
+curl -k https://tkremnov.42.fr
+```
